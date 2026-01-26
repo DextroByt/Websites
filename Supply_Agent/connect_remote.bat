@@ -7,11 +7,21 @@ echo     SUPPLY AGENT - LINK MODE
 echo ===================================================
 echo.
 echo Please look at your 1st Laptop (Warehouse).
-set /p TARGET_IP="Enter the Warehouse IP Address (e.g. 192.168.1.5): "
+echo If Local: Enter IP Address (e.g. 192.168.1.5)
+echo If Internet: Enter Ngrok URL (e.g. https://xyz.ngrok-free.app)
+echo.
+set /p INPUT="Enter Address: "
 
-if "%TARGET_IP%"=="" goto error
+if "%INPUT%"=="" goto error
 
-set TARGET_URL=http://%TARGET_IP%:9001
+:: Check if input starts with http (it's a URL)
+echo %INPUT% | findstr /b /i "http" >nul
+if %errorlevel%==0 (
+    set TARGET_URL=%INPUT%
+) else (
+    set TARGET_URL=http://%INPUT%:9001
+)
+
 echo.
 echo Configuration Set:
 echo TARGET_URL = %TARGET_URL%
@@ -23,6 +33,6 @@ exit
 
 :error
 echo.
-echo Error: You must enter an IP address.
+echo Error: You must enter an address.
 pause
 goto start
