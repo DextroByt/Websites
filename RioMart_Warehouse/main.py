@@ -201,6 +201,39 @@ def create_b2b_order(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+@app.post("/api/v1/order/view")
+def view_order_details(
+    payload: dict,
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(get_api_key)
+):
+    """
+    VULNERABLE ENDPOINT: BOLA (Broken Object Level Authorization)
+    Allows viewing ANY order by ID without checking if the API Key owner matches.
+    """
+    order_id = payload.get("order_id")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing order_id")
+
+    # VULNERABILITY: No check for `order.customer_id == api_key.owner`
+    # We just fetch and return, allowing IDOR/BOLA attacks.
+    
+    # Try filtering by ID (integer) or UUID (string) 
+    order = db.query(CustomerOrder).filter(
+        (CustomerOrder.id == order_id) | (CustomerOrder.order_uuid == str(order_id))
+    ).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order Not Found")
+        
+    return {
+        "status": "success",
+        "order_id": order.order_uuid,
+        "customer": order.customer_id, # Attacker sees who owns it
+        "items": order.items_payload,  # Attacker sees what they bought
+        "total": order.total_amount
+    }
+
 @app.get("/logs/stream")
 def stream_logs(db: Session = Depends(get_db)):
     # Public endpoint for the dashboard polling (or secure it if preferred)
