@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import datetime
 
 # Import Internal Modules
-from database_setup import Session as DBSession, Product, CustomerOrder, AccessLog, APIKey
+from database_setup import Session as DBSession, Product, CustomerOrder, AccessLog, APIKey, InventoryTransaction
 from auth import get_api_key, get_db
 from orders import OrderManager
 from inventory import InventoryManager
@@ -30,6 +30,9 @@ async def intelligent_logging(request: Request, call_next):
     
     duration = (datetime.datetime.now() - start_time).total_seconds() * 1000
     
+    # Console Log (Verbose)
+    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {response.status_code} {request.method} {request.url.path} | {body_str[:100]}")
+
     # Log to Database
     db = DBSession()
     try:
@@ -95,6 +98,45 @@ def manual_order_ui(sku: str = Form(...), quantity: int = Form(...), db: Session
 
 @app.get("/dashboard/orders")
 def get_dashboard_orders(db: Session = Depends(get_db)):
+    orders = db.query(CustomerOrder).order_by(CustomerOrder.created_at.desc()).limit(50).all()
+    # Serialize Items safely
+    output = []
+    for o in orders:
+        output.append({
+            "id": o.order_uuid,
+            "customer": o.customer_id,
+            "total": o.total_amount,
+            "status": o.status,
+            "items": o.items_payload, # Now valid JSON string
+            "created_at": o.created_at.isoformat()
+        })
+    return JSONResponse(output)
+
+@app.post("/control/restock_all")
+def restock_all_endpoint(db: Session = Depends(get_db)):
+    """Global Restock Button Endpoint"""
+    try:
+        products = db.query(Product).all()
+        count = 0
+        for p in products:
+            if p.stock < 500: 
+                add_amount = 1000
+                p.stock += add_amount
+                
+                # Log transaction
+                trans = InventoryTransaction(
+                    product_id=p.id,
+                    change_amount=add_amount,
+                    reason="Global System Restock",
+                    reference_id="SYS_GLOBAL"
+                )
+                db.add(trans)
+                count += 1
+        
+        db.commit()
+        return JSONResponse({"status": "success", "message": f"Restocked {count} low-stock products."})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     """API for dashboard polling of recent orders"""
     orders = db.query(CustomerOrder).order_by(CustomerOrder.created_at.desc()).limit(10).all()
     # Serialize manually or use Pydantic. Simple list of dicts for now.
@@ -163,7 +205,12 @@ def create_b2b_order(
 def stream_logs(db: Session = Depends(get_db)):
     # Public endpoint for the dashboard polling (or secure it if preferred)
     # Keeping it simple for the simulation visualization
-    return db.query(AccessLog).order_by(AccessLog.id.desc()).limit(20).all()
+    # Filter out the dashboard polling noise itself so the logs are readable
+    return db.query(AccessLog)\
+             .filter(AccessLog.endpoint != "/logs/stream")\
+             .filter(AccessLog.endpoint != "/dashboard/orders")\
+             .order_by(AccessLog.id.desc())\
+             .limit(50).all()
 
 if __name__ == "__main__":
     import uvicorn

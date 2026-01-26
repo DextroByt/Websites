@@ -65,6 +65,11 @@ ATTACKS = {
 def _now():
     return datetime.datetime.now().strftime("%H:%M:%S")
 
+def add_log(entry):
+    """Helper to log to memory and console"""
+    print(f"[{entry['time']}] {entry['type']} : {entry['msg']}")
+    agent_logs.append(entry)
+
 # --- INTELLIGENT AUTO-AGENT (Background) ---
 async def supply_chain_manager():
     global simulator, engine, MANAGED_SKUS, MANAGED_PRODUCTS, agent_running
@@ -73,7 +78,7 @@ async def supply_chain_manager():
         # 1. Discovery Phase: Fetch Catalog (With Retry)
         while True:
             try:
-                agent_logs.append({"time": _now(), "msg": "🔍 Discovering Supplier Catalog...", "type": "NORMAL"})
+                add_log({"time": _now(), "msg": "🔍 Discovering Supplier Catalog...", "type": "NORMAL"})
                 resp = await client.get(f"{TARGET_URL}/api/v1/products", headers={"X-API-KEY": API_KEY})
                 
                 if resp.status_code == 200:
@@ -82,12 +87,12 @@ async def supply_chain_manager():
                     MANAGED_PRODUCTS = products # Store full details for UI
                     simulator = DemandSimulator(MANAGED_SKUS)
                     engine = LogisticsEngine(simulator)
-                    agent_logs.append({"time": _now(), "msg": f"✅ Managing Supply Chain for {len(MANAGED_SKUS)} SKUs", "type": "NORMAL"})
+                    add_log({"time": _now(), "msg": f"✅ Managing Supply Chain for {len(MANAGED_SKUS)} SKUs", "type": "NORMAL"})
                     break # Success! Exit discovery loop
                 else:
-                     agent_logs.append({"time": _now(), "msg": f"❌ Catalog Fetch Failed ({resp.status_code}). Retrying in 5s...", "type": "ERROR"})
+                     add_log({"time": _now(), "msg": f"❌ Catalog Fetch Failed ({resp.status_code}). Retrying in 5s...", "type": "ERROR"})
             except Exception as e:
-                agent_logs.append({"time": _now(), "msg": f"❌ Connection Retry: {e}", "type": "ERROR"})
+                add_log({"time": _now(), "msg": f"❌ Connection Retry: {e}", "type": "ERROR"})
             
             await asyncio.sleep(5)
 
@@ -113,7 +118,7 @@ async def supply_chain_manager():
                         sku = order['sku']
                         qty = order['quantity']
                         
-                        agent_logs.append({"time": _now(), "msg": f"📉 Low Stock ({sku}). Placing Order for {qty}...", "type": "WARNING"})
+                        add_log({"time": _now(), "msg": f"📉 Low Stock ({sku}). Placing Order for {qty}...", "type": "WARNING"})
                         
                         # Place Order via API
                         payload = {"items": [{"sku": sku, "quantity": qty}]}
@@ -125,7 +130,7 @@ async def supply_chain_manager():
                         
                         if order_resp.status_code == 200:
                             data = order_resp.json()
-                            agent_logs.append({"time": _now(), "msg": f"✅ Order Confirmed: ID {data.get('order_id')}", "type": "SUCCESS"})
+                            add_log({"time": _now(), "msg": f"✅ Order Confirmed: ID {data.get('order_id')}", "type": "SUCCESS"})
                             # Receive Goods
                             engine.update_stock_after_delivery(sku, qty)
                         else:
@@ -134,7 +139,7 @@ async def supply_chain_manager():
                                 err_detail = order_resp.json().get('detail', order_resp.text)
                             except:
                                 err_detail = order_resp.text
-                            agent_logs.append({"time": _now(), "msg": f"❌ Order Rejected: {err_detail}", "type": "ERROR"})
+                            add_log({"time": _now(), "msg": f"❌ Order Rejected: {err_detail}", "type": "ERROR"})
                 
             except Exception as e:
                 pass # agent_logs.append({"time": _now(), "msg": f"Loop Error: {e}", "type": "ERROR"})
@@ -241,7 +246,7 @@ async def manual_request_order(payload: dict):
     if not sku or qty <= 0:
         return {"status": "error", "message": "Invalid Parameters"}
 
-    agent_logs.append({"time": _now(), "msg": f"📤 Manual Request: {sku} (Qty: {qty})...", "type": "NORMAL"})
+    add_log({"time": _now(), "msg": f"📤 Manual Request: {sku} (Qty: {qty})...", "type": "NORMAL"})
 
     try:
         async with httpx.AsyncClient() as client:
@@ -259,15 +264,15 @@ async def manual_request_order(payload: dict):
                 if engine: engine.update_stock_after_delivery(sku, qty)
                 
                 success_msg = f"✅ Request Approved: Warehouse Order #{data.get('order_id')}"
-                agent_logs.append({"time": _now(), "msg": success_msg, "type": "SUCCESS"})
+                add_log({"time": _now(), "msg": success_msg, "type": "SUCCESS"})
                 return {"status": "success", "message": str(data)}
             else:
                 err_msg = f"❌ Request Denied: {order_resp.text}"
-                agent_logs.append({"time": _now(), "msg": err_msg, "type": "ERROR"})
+                add_log({"time": _now(), "msg": err_msg, "type": "ERROR"})
                 return {"status": "rejected", "message": order_resp.text}
                 
     except Exception as e:
-        agent_logs.append({"time": _now(), "msg": f"❌ Connection Error: {e}", "type": "ERROR"})
+        add_log({"time": _now(), "msg": f"❌ Connection Error: {e}", "type": "ERROR"})
         return {"status": "error", "message": str(e)}
 
 @app.post("/control/{action}")
@@ -311,7 +316,7 @@ async def trigger_attack(attack: AttackRequest):
 
             agent_logs.append({"time": _now(), "msg": msg, "type": l_type})
     except Exception as e:
-         agent_logs.append({"time": _now(), "msg": f"❌ Connection Error: {e}", "type": "ERROR"})
+         add_log({"time": _now(), "msg": f"❌ Connection Error: {e}", "type": "ERROR"})
     
     return {"status": "Attack Sent"}
 

@@ -3,6 +3,8 @@ from database_setup import Product, CustomerOrder, InventoryTransaction
 import datetime
 import uuid
 
+import json
+
 class OrderManager:
     def __init__(self, db: Session):
         self.db = db
@@ -53,7 +55,7 @@ class OrderManager:
             customer_id=customer_id,
             status="Confirmed", # Auto-confirm if stock is available
             total_amount=round(total_amount, 2),
-            items_payload=str(items) # Storing as stringified JSON for simplicity in SQLite
+            items_payload=json.dumps(items) # Storing as valid JSON for UI parsing
         )
         
         self.db.add(new_order)
