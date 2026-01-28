@@ -17,7 +17,7 @@ from purchasing import LogisticsEngine
 templates = Jinja2Templates(directory="templates")
 
 # CONFIGURATION
-TARGET_URL = os.environ.get("TARGET_URL", "http://localhost:9001")
+TARGET_URL = os.environ.get("TARGET_URL", "http://localhost:9006")
 API_KEY = "rio_sk_live_7384928492" # The key we seeded in RioMart
 
 # STATE
@@ -346,7 +346,55 @@ async def trigger_attack(attack: AttackRequest):
     
     return {"status": "Attack Sent"}
 
+# --- NETRA SECURE MOVE LISTENER (AGENT B) ---
+# This endpoint listens for incoming "moves" or updates from Agent A (Warehouse)
+# In the Netra Peer-to-Peer model, the Warehouse might "push" updates here.
+
+@app.post("/api/v1/secure_response")
+async def handle_incoming_secure_move(data: dict):
+    """
+    Receives and processes a secure transaction from Agent A.
+    This demonstrates the 'Return Move' logic.
+    """
+    # 1. Process the incoming secure data
+    order_id = data.get("order_id", "Unknown")
+    status = data.get("status", "Pending")
+    msg = data.get("warehouse_msg", "")
+    
+    add_log({
+        "time": _now(), 
+        "msg": f"🛡️ SECURE MOVE RECEIVED: Order {order_id} is {status}. Logic: {msg}", 
+        "type": "SUCCESS"
+    })
+    
+    # 2. Optionally Prepare a Secure Acknowledgment (The Counter-Move)
+    # This is the LIVE URL of Laptop A's Netra Proxy Ingress (Port 8000)
+    LAPTOP_A_PUBLIC_URL = os.environ.get("LAPTOP_A_INGRESS_URL", "http://warehouse-ingress.ngrok.io")
+    
+    ack_packet = {
+        "order_id": order_id,
+        "acknowledgment": "Move verified and state updated in Agent B.",
+        "timestamp": _now()
+    }
+
+    # 3. Use Netra Egress to send back the Acknowledgment
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "http://localhost:9006", # Agent B's local Egress Proxy
+                json=ack_packet,
+                headers={
+                    "X-Target-URL": LAPTOP_A_PUBLIC_URL,
+                    "X-API-KEY": "agent_b_internal_sk"
+                }
+            )
+    except Exception as e:
+        # In a real scenario, we would log this to the console
+        pass
+
+    return {"status": "Move Captured. Counter-Move Sent."}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9002)
+    uvicorn.run(app, host="0.0.0.0", port=9001)
 

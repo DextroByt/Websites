@@ -4,6 +4,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import datetime
+import httpx
+import os
 
 # Import Internal Modules
 from database_setup import Session as DBSession, Product, CustomerOrder, AccessLog, APIKey, InventoryTransaction
@@ -171,34 +173,55 @@ def check_low_stock(db: Session = Depends(get_db), api_key: APIKey = Depends(get
     return inv.get_low_stock_items()
 
 @app.post("/api/v1/order")
-def create_b2b_order(
+async def create_b2b_order(
     order_data: dict, 
     db: Session = Depends(get_db), 
     api_key: APIKey = Depends(get_api_key)
 ):
     """
-    Enterprise Order Endpoint.
-    Expects JSON: {"items": [{"sku": "...", "quantity": 1}]}
+    Agent A (Warehouse) - Processes order and initiates Secure Move to Agent B.
     """
     mgr = OrderManager(db)
     try:
         items = order_data.get("items", [])
         if not items:
-            # Fallback for legacy simple format if needed, or strictly enforce new format
-            # Let's support the simple format used in the prompt's example if possible or just fail
-            # The prompt example had {"product": "name"}. We are moving to SKU based.
-            # We will reject legacy format to enforce "Enterprise Quality".
             raise ValueError("Invalid Format. Expected 'items' list with SKUs.")
             
         order = mgr.create_order(customer_id=api_key.owner, items=items)
-        return {
-            "status": "Order Confirmed",
+        print(f"✅ Processing order {order.order_uuid} for {api_key.owner}")
+
+        # --- NETRA SECURE MOVE REDIRECTION (Move to Agent B) ---
+        # This is the LIVE URL of Laptop B's Netra Proxy Ingress (Port 8000)
+        LAPTOP_B_PUBLIC_URL = os.environ.get("LAPTOP_B_INGRESS_URL", "http://site-b-ngrok-url.io")
+        
+        confirmation_packet = {
             "order_id": order.order_uuid,
-            "total_amount": order.total_amount
+            "status": "SECURE_VERIFIED",
+            "warehouse_msg": "Packet signed and identity confirmed. Move initiated from Agent A."
+        }
+
+        # Use local Egress Proxy (Port 9005 for Laptop A)
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    "http://localhost:9005", # Agent A's local Egress
+                    json=confirmation_packet,
+                    headers={
+                        "X-Target-URL": LAPTOP_B_PUBLIC_URL,
+                        "X-API-KEY": "rio_sk_live_internal"
+                    }
+                )
+        except Exception as e:
+            print(f"⚠️ Netra Egress (9005) Failed: {e}")
+
+        return {
+            "status": "Identity Verified. Secondary Secure Transaction Initiated.",
+            "order_id": order.order_uuid
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"❌ Order Error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/api/v1/order/view")
@@ -247,6 +270,6 @@ def stream_logs(db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    # HOST on 9001
-    uvicorn.run(app, host="0.0.0.0", port=9001)
+    # HOST on 9002 (Laptop A App Port)
+    uvicorn.run(app, host="0.0.0.0", port=9002)
 
