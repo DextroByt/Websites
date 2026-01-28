@@ -8,6 +8,9 @@ import asyncio
 import datetime
 import random
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Internal Modules
 from forecasting import DemandSimulator
@@ -17,7 +20,7 @@ from purchasing import LogisticsEngine
 templates = Jinja2Templates(directory="templates")
 
 # CONFIGURATION
-TARGET_URL = os.environ.get("TARGET_URL", "http://localhost:9006")
+TARGET_URL = os.environ.get("TARGET_URL", "http://localhost:9005")
 API_KEY = "rio_sk_live_7384928492" # The key we seeded in RioMart
 
 # STATE
@@ -156,7 +159,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     pass
 
-app = FastAPI(title="RioMart Agent", lifespan=lifespan)
+app = FastAPI(title="Supply Agent (Agent A)", lifespan=lifespan)
 
 # Enable CORS
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -368,8 +371,8 @@ async def handle_incoming_secure_move(data: dict):
     })
     
     # 2. Optionally Prepare a Secure Acknowledgment (The Counter-Move)
-    # This is the LIVE URL of Laptop A's Netra Proxy Ingress (Port 8000)
-    LAPTOP_A_PUBLIC_URL = os.environ.get("LAPTOP_A_INGRESS_URL", "http://warehouse-ingress.ngrok.io")
+    # This is the LIVE URL of Laptop B's Netra Proxy Ingress (Port 8000)
+    LAPTOP_B_PUBLIC_URL = os.environ.get("LAPTOP_B_INGRESS_URL", "https://site-b-ngrok.io")
     
     ack_packet = {
         "order_id": order_id,
@@ -381,11 +384,11 @@ async def handle_incoming_secure_move(data: dict):
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
-                "http://localhost:9006", # Agent B's local Egress Proxy
+                "http://localhost:9005", # Agent A's local Egress Proxy
                 json=ack_packet,
                 headers={
-                    "X-Target-URL": LAPTOP_A_PUBLIC_URL,
-                    "X-API-KEY": "agent_b_internal_sk"
+                    "X-Target-URL": LAPTOP_B_PUBLIC_URL,
+                    "X-API-KEY": "agent_a_internal_sk"
                 }
             )
     except Exception as e:
@@ -396,5 +399,5 @@ async def handle_incoming_secure_move(data: dict):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9001)
+    uvicorn.run(app, host="0.0.0.0", port=9002)
 

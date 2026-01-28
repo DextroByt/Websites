@@ -3,9 +3,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+import os
 import datetime
 import httpx
-import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Import Internal Modules
 from database_setup import Session as DBSession, Product, CustomerOrder, AccessLog, APIKey, InventoryTransaction
@@ -13,7 +16,7 @@ from auth import get_api_key, get_db
 from orders import OrderManager
 from inventory import InventoryManager
 
-app = FastAPI(title="Warehouse")
+app = FastAPI(title="RioMart Warehouse (Agent B)")
 templates = Jinja2Templates(directory="templates")
 
 # --- MIDDLEWARE & LOGGING ---
@@ -190,29 +193,29 @@ async def create_b2b_order(
         order = mgr.create_order(customer_id=api_key.owner, items=items)
         print(f"✅ Processing order {order.order_uuid} for {api_key.owner}")
 
-        # --- NETRA SECURE MOVE REDIRECTION (Move to Agent B) ---
-        # This is the LIVE URL of Laptop B's Netra Proxy Ingress (Port 8000)
-        LAPTOP_B_PUBLIC_URL = os.environ.get("LAPTOP_B_INGRESS_URL", "http://site-b-ngrok-url.io")
+        # --- NETRA SECURE MOVE REDIRECTION (Move to Agent A) ---
+        # This is the LIVE URL of Laptop A's Netra Proxy Ingress (Port 8001)
+        LAPTOP_A_PUBLIC_URL = os.environ.get("LAPTOP_A_INGRESS_URL", "http://site-a-ngrok-url.io")
         
         confirmation_packet = {
             "order_id": order.order_uuid,
             "status": "SECURE_VERIFIED",
-            "warehouse_msg": "Packet signed and identity confirmed. Move initiated from Agent A."
+            "warehouse_msg": "Packet signed and identity confirmed. Move initiated from Agent B."
         }
 
-        # Use local Egress Proxy (Port 9005 for Laptop A)
+        # Use local Egress Proxy (Port 9006 for Laptop B)
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
-                    "http://localhost:9005", # Agent A's local Egress
+                    "http://localhost:9006", # Agent B's local Egress
                     json=confirmation_packet,
                     headers={
-                        "X-Target-URL": LAPTOP_B_PUBLIC_URL,
+                        "X-Target-URL": LAPTOP_A_PUBLIC_URL,
                         "X-API-KEY": "rio_sk_live_internal"
                     }
                 )
         except Exception as e:
-            print(f"⚠️ Netra Egress (9005) Failed: {e}")
+            print(f"⚠️ Netra Egress (9006) Failed: {e}")
 
         return {
             "status": "Identity Verified. Secondary Secure Transaction Initiated.",
@@ -270,6 +273,6 @@ def stream_logs(db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    # HOST on 9002 (Laptop A App Port)
-    uvicorn.run(app, host="0.0.0.0", port=9002)
+    # HOST on 9001 (Laptop B App Port)
+    uvicorn.run(app, host="0.0.0.0", port=9001)
 

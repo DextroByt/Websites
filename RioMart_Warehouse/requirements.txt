@@ -3,3 +3,4 @@ uvicorn
 sqlalchemy
 faker
 python-multipart
+python-dotenv
