@@ -1,6 +1,6 @@
 # Netra Site Simulation Blueprint (Local Edition)
 
-This document is a comprehensive guide to building **Site A (Intelligent Supply Agent)** and **Site B (Rio Mart Warehouse)** for the Netra Protocol simulation.
+This document is a comprehensive guide to building **Site A (Intelligent ShopMart Agent)** and **Site B (Rio Mart Warehouse)** for the Netra Protocol simulation.
 
 **Deployment Model**: Local Hosting (Single Device).
 **Ports**: Designated to avoid conflicts with Netra.
@@ -17,7 +17,7 @@ This document is a comprehensive guide to building **Site A (Intelligent Supply 
 *   **Data Assets**: Real product catalog, live inventory counts, sensitive customer PII.
 
 ### **Site A: Supply Chain Agent (The Client / Attacker)**
-*   **Identity**: An autonomous "Intelligent Supply Agent" designed to optimize logistics.
+*   **Identity**: An autonomous "Intelligent ShopMart Agent" designed to optimize logistics.
 *   **Role**: The **Client/Consumer**. It periodically polls Rio Mart to check for low stock and "auto-orders" supplies.
 *   **The Twist**: This Agent also has a **"Red Team Mode"**. It can be hijacked to send malicious queries (SQLi, Prompt Injection) to Rio Mart to test its defenses.
 
@@ -181,13 +181,13 @@ if __name__ == "__main__":
 
 ---
 
-## 4. Site A: Supply Agent Implementation (Enhanced)
+## 4. Site A: ShopMart Agent Implementation (Enhanced)
 
-**Folder**: `Supply_Agent/`
+**Folder**: `ShopMart_Agent/`
 **Port**: `9002`
 
 ### **4.1. Visual Attack Dashboard**
-We will creating a rich **React/HTML Dashboard** file `dashboard.html` in `Supply_Agent/static/` (or just serve as raw HTML string for simplicity in Python).
+We will creating a rich **React/HTML Dashboard** file `dashboard.html` in `ShopMart_Agent/static/` (or just serve as raw HTML string for simplicity in Python).
 
 **Features**:
 *   **Attack Grid**: Cards for each attack type (SQLi, BOLA, MITM, Hijack, Prompt Injection).
@@ -206,7 +206,7 @@ import asyncio
 import datetime
 import random
 
-app = FastAPI(title="Intelligent Supply Agent & Red Team Console")
+app = FastAPI(title="Intelligent ShopMart Agent & Red Team Console")
 
 # Enable CORS for the Dashboard
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -282,7 +282,7 @@ def get_dashboard():
         <style>body { background-color: #0f172a; color: #e2e8f0; }</style>
     </head>
     <body class="p-8">
-        <h1 class="text-3xl font-bold mb-8 text-red-500">🔻 Supply Agent RED TEAM Console</h1>
+        <h1 class="text-3xl font-bold mb-8 text-red-500">🔻 ShopMart Agent RED TEAM Console</h1>
         
         <div class="grid grid-cols-3 gap-6">
             <!-- Attack Cards Generator -->
@@ -390,9 +390,9 @@ if __name__ == "__main__":
     *   `python main.py`
     *   *Result*: Running on `http://localhost:9001`
 
-2.  **Start Supply Agent**:
+2.  **Start ShopMart Agent**:
     *   Open Terminal 2
-    *   `cd Supply_Agent`
+    *   `cd ShopMart_Agent`
     *   `python app.py`
     *   *Result*: Running on `http://localhost:9002`
 
@@ -442,7 +442,7 @@ graph LR
 ### **6.3. Step-by-Step Integration**
 
 #### **Step A: Configure Site A (Agent)**
-*   **Target Change**: In `Supply_Agent/app.py`, change `TARGET_URL`:
+*   **Target Change**: In `ShopMart_Agent/app.py`, change `TARGET_URL`:
     ```python
     # OLD (Insecure)
     # TARGET_URL = "http://localhost:9001"

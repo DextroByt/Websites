@@ -14,7 +14,8 @@ load_dotenv()
 from database_setup import Session as DBSession, Product, CustomerOrder, AccessLog, APIKey, InventoryTransaction
 from auth import get_api_key, get_db
 from orders import OrderManager
-from inventory import InventoryManager
+# CONFIGURATION
+LAPTOP_A_INGRESS_URL = os.environ.get("LAPTOP_A_INGRESS_URL", "http://localhost:8001") # Defaulting to local ingress port of Agent A
 
 app = FastAPI(title="RioMart Warehouse (Agent B)")
 templates = Jinja2Templates(directory="templates")
@@ -194,8 +195,8 @@ async def create_b2b_order(
         print(f"✅ Processing order {order.order_uuid} for {api_key.owner}")
 
         # --- NETRA SECURE MOVE REDIRECTION (Move to Agent A) ---
-        # This is the LIVE URL of Laptop A's Netra Proxy Ingress (Port 8001)
-        LAPTOP_A_PUBLIC_URL = os.environ.get("LAPTOP_A_INGRESS_URL", "http://site-a-ngrok-url.io")
+        # Get the Target URL from Env (defined at top level or here)
+        TARGET_FOR_A = os.environ.get("LAPTOP_A_INGRESS_URL", "http://localhost:8001")
         
         confirmation_packet = {
             "order_id": order.order_uuid,
@@ -205,15 +206,18 @@ async def create_b2b_order(
 
         # Use local Egress Proxy (Port 9006 for Laptop B)
         try:
+            print(f"📡 Sending Secure Confirmation via Netra (9006) -> {TARGET_FOR_A}")
             async with httpx.AsyncClient() as client:
                 await client.post(
                     "http://localhost:9006", # Agent B's local Egress
                     json=confirmation_packet,
                     headers={
-                        "X-Target-URL": LAPTOP_A_PUBLIC_URL,
+                        "X-Target-URL": TARGET_FOR_A,
                         "X-API-KEY": "rio_sk_live_internal"
                     }
                 )
+        except Exception as e:
+            print(f"⚠️ Netra Egress (9006) Failed: {e}")
         except Exception as e:
             print(f"⚠️ Netra Egress (9006) Failed: {e}")
 
@@ -274,5 +278,5 @@ def stream_logs(db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     # HOST on 9001 (Laptop B App Port)
-    uvicorn.run(app, host="0.0.0.0", port=9001)
+    uvicorn.run(app, host="127.0.0.1", port=9002)
 

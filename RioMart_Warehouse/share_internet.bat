@@ -74,7 +74,7 @@ echo ACTION REQUIRED:
 echo 1. LOOK FOR A SECOND BLACK WINDOW (Taskbar)
 echo 2. Copy the URL ending in '.ngrok-free.app'
 echo    (Example: https://a1b2-c3d4.ngrok-free.app)
-echo 3. Send this URL to the Supply Agent user.
+echo 3. Send this URL to the ShopMart Agent user.
 echo ===================================================
 echo.
 echo Starting Warehouse Server...

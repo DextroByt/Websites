@@ -1,9 +1,9 @@
 @echo off
-title Supply Agent - Remote Connector
+title ShopMart Agent - Remote Connector
 color 0B
 cls
 echo ===================================================
-echo     SUPPLY AGENT - LINK MODE
+echo     SHOPMART AGENT - LINK MODE
 echo ===================================================
 echo.
 echo Please look at your 1st Laptop (Warehouse).
